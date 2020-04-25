@@ -30,22 +30,47 @@ python_type_map = {
 
 
 def _resolve_node(unknown_type):
-    if unknown_type is str:
+    if unknown_type is None:
+        return JsonSchemaNull()
+    elif unknown_type is str:
         if unknown_type in native_jsonschema_map:
             return native_jsonschema_map[unknown_type]
         return JsonSchemaString()
-    elif unknown_type in python_type_map:
-        return native_jsonschema_map[python_type_map[unknown_type]]
+    elif unknown_type is bool:
+        return JsonSchemaBoolean()
+    elif unknown_type is int:
+        return JsonSchemaInteger()
+    elif unknown_type is float:
+        return JsonSchemaNumber()
+    elif unknown_type is dict:
+        return JsonSchemaObject()
+    elif unknown_type is list:
+        return JsonSchemaArray()
 
     return None
 
 
 class JsonSchemaNode(object):
+    @classmethod
+    def from_python(cls, obj):
+        node = _resolve_node(obj)
+        if node is None:
+            node = _resolve_node(type(obj))
+        return node
+
     def render(self):
         raise NotImplementedError('Base class does not implement rendering.')
 
     def is_native(self):
         return False
+
+
+class JsonSchemaNull(JsonSchemaNode):
+    def render(self):
+        return {"type": "null"}
+
+    def is_native(self):
+        return True
 
 
 class JsonSchemaRef(JsonSchemaNode):
@@ -77,12 +102,20 @@ def _find_ref_node_in_schema(unknown_type, schema_context) -> (JsonSchemaRef, No
 
 class JsonSchemaObject(JsonSchemaNode):
     @classmethod
+    def from_dict(cls, d: dict):
+        schema_obj = cls()
+        for p_name in d:
+            p_val = d[p_name]
+            schema_obj.add_property(p_name, p_val)
+        return schema_obj
+
+    @classmethod
     def from_object(schema_class, cls):
         assert inspect.isclass(cls)
         cls_annotations = cls.__dict__.get('__annotations__', {})
         cls_fields = [_get_field(cls, name, type) for name, type in cls_annotations.items()]
 
-        schema_obj = JsonSchemaObject()
+        schema_obj = schema_class()
         for f in cls_fields:
             schema_obj.add_property(f.name, f.type)
             #print(f)
@@ -96,7 +129,10 @@ class JsonSchemaObject(JsonSchemaNode):
         type_node = _resolve_node(raw_type)
         if type_node is None:
             # TODO resolve name
-            type_name = str(raw_type.__name__)
+            if hasattr(raw_type, '__name__'):
+                type_name = str(raw_type.__name__)
+            else:
+                type_name = type(raw_type).__name__
             type_node = JsonSchemaRef(type_name)
         self._properties[name] = type_node
 
