@@ -1,15 +1,10 @@
 import pytest
 import os
 import json
-from jsonschema import validate
+from .util import validate
 
 from dataclasses import dataclass
 from jsbuilder.builder import JsonSchemaBuilder
-
-
-draft07_schema_file = 'json/draft-07/schema'
-with open(draft07_schema_file, 'r') as handle:
-    draft07_schema = json.load(handle)
 
 
 class SomeType:
@@ -30,7 +25,7 @@ def test_empty_builder_is_valid_schema():
     builder = JsonSchemaBuilder()
     schema_instance = builder.render()
 
-    validate(schema_instance, draft07_schema)
+    validate(schema_instance)
 
 
 def test_dev():
@@ -48,4 +43,4 @@ def test_valid_schema():
     print(json.dumps(builder.render(), indent=1))
 
     #validate(json.dumps(builder.render()), json.dumps(draft07_schema))
-    validate(builder.render(), draft07_schema)
+    validate(builder.render())
