@@ -46,6 +46,8 @@ def _resolve_node(unknown_type):
         return JsonSchemaObject()
     elif unknown_type is list:
         return JsonSchemaArray()
+    elif hasattr(unknown_type, '__name__'):
+        return JsonSchemaRef(getattr(unknown_type, '__name__'))
 
     return None
 
@@ -121,7 +123,7 @@ class JsonSchemaObject(JsonSchemaNode):
         return schema_obj
 
     @classmethod
-    def from_object(schema_class, cls):
+    def from_class(schema_class, cls):
         assert inspect.isclass(cls)
         cls_annotations = cls.__dict__.get('__annotations__', {})
         cls_fields = [_get_field(cls, name, type) for name, type in cls_annotations.items()]
@@ -311,7 +313,7 @@ class JsonSchemaBuilder(object):
         self._properties[name] = type_node
 
     def add_definition(self, type_name, raw_type):
-        type_obj = JsonSchemaObject.from_object(raw_type)
+        type_obj = JsonSchemaObject.from_class(raw_type)
         if type_name in self._definitions and self._definitions[type_name] != type_obj:
             raise TypeError('You already have added a definition for <T> but it was different: <A> != <B>'.format(T=type_name, A=self._definitions[type_name], B=type_obj))
         self._definitions[type_name] = type_obj

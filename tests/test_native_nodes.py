@@ -18,7 +18,7 @@ def test_empty_object():
 
 
 def test_object_node_from_class():
-    node = JsonSchemaObject.from_object(MyType)
+    node = JsonSchemaObject.from_class(MyType)
     schema_instance = node.render()
 
     print(json.dumps(node.render(), indent=1))
