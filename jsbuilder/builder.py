@@ -57,13 +57,45 @@ class JsonSchemaResolver():
         raise NotImplementedError()
 
 
+class DefaultJsonSchemaResolver(JsonSchemaResolver):
+    def resolve(self, unknown_type):
+        if unknown_type is None:
+            return JsonSchemaNull()
+        if unknown_type is str:
+            if unknown_type in native_jsonschema_map:
+                return native_jsonschema_map[unknown_type]
+            return JsonSchemaString()
+        if unknown_type is bool:
+            return JsonSchemaBoolean()
+        if unknown_type is int:
+            return JsonSchemaInteger()
+        if unknown_type is float:
+            return JsonSchemaNumber()
+        if unknown_type is dict:
+            return JsonSchemaObject()
+        if unknown_type is list:
+            return JsonSchemaArray()
+
+        # Given object is a complex class or an exemplary object
+        # TODO use object to resolve
+        if hasattr(unknown_type, '__annotations__'):
+            return JsonSchemaObject.from_class(unknown_type)
+
+        if hasattr(unknown_type, '__name__'):
+            return JsonSchemaRef(getattr(unknown_type, '__name__'))
+
+        native_type = type(unknown_type)
+        node = self.resolve(native_type)
+        # TODO node set default
+
+        return node
+
+
 class JsonSchemaNode(object):
     @classmethod
     def from_python(cls, obj):
-        node = _resolve_node(obj)
-        if node is None:
-            node = _resolve_node(type(obj))
-        return node
+        resolver = DefaultJsonSchemaResolver()
+        return resolver.resolve(obj)
 
     def render(self, resolver: JsonSchemaResolver = None):
         raise NotImplementedError('Base class does not implement rendering.')
