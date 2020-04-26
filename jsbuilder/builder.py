@@ -20,12 +20,12 @@ native_jsonschema_types = [
 ]
 
 python_type_map = {
-    str: "string",
-    int: "number",
-    float: "number",
-    dict: "object",
-    list: "array",
-    bool: "boolean"
+    str: NativeJsonschemaTypes.string,
+    int: NativeJsonschemaTypes.number,
+    float: NativeJsonschemaTypes.number,
+    dict: NativeJsonschemaTypes.object,
+    list: NativeJsonschemaTypes.array,
+    bool: NativeJsonschemaTypes.boolean
 }
 
 
@@ -57,7 +57,34 @@ class JsonSchemaResolver():
         raise NotImplementedError()
 
 
+class JsonSchemaChainedResolver():
+    def __init__(self, resolvers: List[JsonSchemaResolver]):
+        self._chain_resolvers = resolvers
+
+    def __radd__(self, other):
+        if not isinstance(other, JsonSchemaResolver):
+            raise ValueError('Can only add JsonSchemaResolver to chain.')
+        self.add_resolver(other)
+
+    def resolve(self, descr):
+        for resolver in self._chain_resolvers:
+            node = resolver.resolve(descr)
+            if node is not None:
+                return node
+        return None
+
+    def add_resolver(self, resolver: JsonSchemaResolver):
+        self._chain_resolvers.append(resolver)
+
+
 class DefaultJsonSchemaResolver(JsonSchemaResolver):
+    @classmethod
+    def get_instance(cls):
+        CLS_KEY_INSTANCE = '__default_resolver'
+        if not hasattr(cls, CLS_KEY_INSTANCE):
+            setattr(cls, CLS_KEY_INSTANCE, cls())
+        return getattr(cls, CLS_KEY_INSTANCE)
+
     def resolve(self, unknown_type):
         if unknown_type is None:
             return JsonSchemaNull()
@@ -92,12 +119,21 @@ class DefaultJsonSchemaResolver(JsonSchemaResolver):
 
 
 class JsonSchemaNode(object):
+    _resolver: JsonSchemaResolver = None
+
     @classmethod
     def from_python(cls, obj):
-        resolver = DefaultJsonSchemaResolver()
-        return resolver.resolve(obj)
+        return DefaultJsonSchemaResolver.get_instance().resolve(obj)
 
-    def render(self, resolver: JsonSchemaResolver = None):
+    @property
+    def resolver(self):
+        return self._resolver if self._resolver is not None else DefaultJsonSchemaResolver.get_instance()
+
+    @resolver.setter
+    def resolver(self, resolver: JsonSchemaResolver):
+        self._resolver = resolver
+
+    def render(self):
         raise NotImplementedError('Base class does not implement rendering.')
 
     def is_native(self):
@@ -105,7 +141,7 @@ class JsonSchemaNode(object):
 
 
 class JsonSchemaNull(JsonSchemaNode):
-    def render(self, resolver: JsonSchemaResolver = None):
+    def render(self):
         return {"type": "null"}
 
     def is_native(self):
@@ -117,7 +153,7 @@ class JsonSchemaRef(JsonSchemaNode):
         self._root = root
         self._ref_name = ref_name
 
-    def render(self, resolver: JsonSchemaResolver = None):
+    def render(self):
         return {"$ref": self._root + self._ref_name}
 
     def is_native(self):
@@ -170,7 +206,7 @@ class JsonSchemaObject(JsonSchemaNode):
     def __init__(self, properties: list = None):
         self._properties = properties or {}
 
-    def add_property(self, name, raw_type):
+    """def add_property(self, name, raw_type):
         type_node = _resolve_node(raw_type)
         if type_node is None:
             # TODO resolve name
@@ -179,22 +215,17 @@ class JsonSchemaObject(JsonSchemaNode):
             else:
                 type_name = type(raw_type).__name__
             type_node = JsonSchemaRef(type_name)
-        self._properties[name] = type_node
+        self._properties[name] = type_node"""
 
-    def render(self, resolver: JsonSchemaResolver = None):
+    def add_property(self, name, raw_type):
+        self._properties[name] = self.resolver.resolve(raw_type)
+
+    def render(self):
         descr = {"type": "object"}
 
         descr_properties = {}
         for prop_name in self._properties:
-            node = self._properties[prop_name]
-
-            if resolver is not None:
-                resolved_node = resolver.resolve(node)
-                descr_properties[prop_name] = resolved_node.render()
-            elif isinstance(node, JsonSchemaNode):
-                descr_properties[prop_name] = self._properties[prop_name].render()
-            elif node in python_type_map:
-                descr_properties[prop_name] = {"type": python_type_map[node]}
+            descr_properties[prop_name] = self._properties[prop_name].render()
         if len(descr_properties) > 0:
             descr["properties"] = descr_properties
 
@@ -221,7 +252,7 @@ class JsonSchemaObject(JsonSchemaNode):
 
 
 class JsonSchemaArray(JsonSchemaNode):
-    def render(self, resolver: JsonSchemaResolver = None):
+    def render(self):
         return {
             "type": "array"
         }
@@ -241,7 +272,7 @@ class JsonSchemaNumber(JsonSchemaNode):
             assert multipleOf > 0  # must be a positive number
         self._multiple_of = multipleOf
 
-    def render(self, resolver: JsonSchemaResolver = None):
+    def render(self):
         descr = { "type": self._exact_type }
         if self._multiple_of is not None:
             descr["multipleOf"] = self._multiple_of
@@ -255,7 +286,7 @@ class JsonSchemaNumber(JsonSchemaNode):
 
 
 class JsonSchemaInteger(JsonSchemaNode):
-    def render(self, resolver: JsonSchemaResolver = None):
+    def render(self):
         return {
             "type": "integer"
         }
@@ -268,7 +299,7 @@ class JsonSchemaInteger(JsonSchemaNode):
 
 
 class JsonSchemaString(JsonSchemaNode):
-    def render(self, resolver: JsonSchemaResolver = None):
+    def render(self):
         return {
             "type": "string"
         }
@@ -293,25 +324,26 @@ class JsonSchemaBoolean(JsonSchemaNode):
         return isinstance(other, JsonSchemaBoolean)
 
 
-native_jsonschema_map = {}
-native_jsonschema_map[NativeJsonschemaTypes.string] = JsonSchemaString()
-native_jsonschema_map[NativeJsonschemaTypes.number] = JsonSchemaNumber()
-native_jsonschema_map[NativeJsonschemaTypes.object] = JsonSchemaObject()
-native_jsonschema_map[NativeJsonschemaTypes.array] = JsonSchemaArray()
-native_jsonschema_map[NativeJsonschemaTypes.boolean] = JsonSchemaBoolean()
+native_jsonschema_map = {
+    NativeJsonschemaTypes.string: JsonSchemaString(),
+    NativeJsonschemaTypes.number: JsonSchemaNumber(),
+    NativeJsonschemaTypes.object: JsonSchemaObject(),
+    NativeJsonschemaTypes.array: JsonSchemaArray(),
+    NativeJsonschemaTypes.boolean: JsonSchemaBoolean()
+}
 
 
-class JsonSchemaBuilder(object):
+class JsonSchemaBuilder(JsonSchemaObject):
     _DEFAULT_URI = 'http://json-schema.org/draft-07/schema#'
 
-    def __init__(self, schema_uri: str=None):
+    def __init__(self, schema_uri: str = None):
+        super().__init__()
         self._schema_uri = schema_uri if schema_uri is not None else JsonSchemaBuilder._DEFAULT_URI
         self._properties = {}
         self._definitions = {}
+        self.resolver = JsonSchemaChainedResolver([JsonSchemaBuilderResolver(self), DefaultJsonSchemaResolver.get_instance()])
 
     def render(self):
-        resolver = JsonSchemaBuilderResolver(self)
-
         descr = {}
         descr["$schema"] = self._schema_uri
         descr["type"] = "object"
@@ -320,29 +352,19 @@ class JsonSchemaBuilder(object):
         for prop_name in self._properties:
             node = self._properties[prop_name]
             assert isinstance(node, JsonSchemaNode), 'Property nodes should have been translated to node objects.'
-            descr_props[prop_name] = node.render(resolver)
+            node.resolver = self.resolver
+            descr_props[prop_name] = node.render()
 
         descr_defs = {}
         for def_name in self._definitions:
             node = self._definitions[def_name]
             assert isinstance(node, JsonSchemaNode), 'Property nodes should have been translated to node objects.'
+            node.resolver = self.resolver
             descr_defs[def_name] = node.render()
 
         descr["definitions"] = descr_defs
         descr["properties"] = descr_props
         return descr
-
-    def add_property(self, name, raw_type):
-        type_node = _resolve_node(raw_type)
-        if type_node is None:
-            type_ref = _find_ref_node_in_defs(raw_type, self._definitions)
-            if type_ref is None:
-                # TODO resolve name
-                type_name = str(raw_type.__name__)
-                self.add_definition(type_name, raw_type)
-                type_ref = JsonSchemaRef(type_name)
-            type_node = type_ref
-        self._properties[name] = type_node
 
     def add_definition(self, type_name, raw_type):
         type_obj = JsonSchemaObject.from_class(raw_type)
@@ -352,7 +374,7 @@ class JsonSchemaBuilder(object):
 
 
 class JsonSchemaBuilderResolver(JsonSchemaResolver):
-    _refs = {}
+    _refs = set()
 
     def __init__(self, builder: JsonSchemaBuilder):
         self._builder = builder
@@ -364,6 +386,9 @@ class JsonSchemaBuilderResolver(JsonSchemaResolver):
             else:
                 ref = self._find_ref_by_node(descr)
                 return ref
+        """else:
+            raise ValueError('Got description <{descr}>'.format(descr=descr))"""
+        return None
 
     def _find_ref_by_name(self, name) -> (JsonSchemaRef, None):
         for d in self._builder._definitions:

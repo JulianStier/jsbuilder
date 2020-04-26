@@ -9,7 +9,7 @@ from jsbuilder.builder import JsonSchemaBuilder
 
 class SomeType:
     my_prop: int
-    aList: list = ["a", "b", "c"]
+    aList: list
 
 
 @dataclass()
