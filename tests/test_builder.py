@@ -1,5 +1,3 @@
-import pytest
-import os
 import json
 from .util import validate
 
@@ -7,9 +5,15 @@ from dataclasses import dataclass
 from jsbuilder.builder import JsonSchemaBuilder
 
 
+class TinyType:
+    a_key: str
+    a_val: float
+
+
 class SomeType:
     my_prop: int
     aList: list
+    tiny: TinyType
 
 
 @dataclass()
@@ -31,7 +35,10 @@ def test_empty_builder_is_valid_schema():
 def test_dev():
     builder = JsonSchemaBuilder()
     builder.add_property('name', str)
-    builder.add_property('bar', SubType)
+    builder.add_property('bar1', SubType)
+    builder.add_property('bar2', SubType)
+
+    print(json.dumps(builder.render(), indent=1))
 
 
 def test_valid_schema():

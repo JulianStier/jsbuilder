@@ -1,4 +1,5 @@
 import inspect
+import json
 from dataclasses import _get_field
 from typing import List
 
@@ -139,6 +140,9 @@ class JsonSchemaNode(object):
     def is_native(self):
         return False
 
+    def __str__(self):
+        return json.dumps(self.render())
+
 
 class JsonSchemaNull(JsonSchemaNode):
     def render(self):
@@ -246,9 +250,6 @@ class JsonSchemaObject(JsonSchemaNode):
                 return False
 
         return True
-
-    def __str__(self):
-        return self.render()
 
 
 class JsonSchemaArray(JsonSchemaNode):
@@ -375,6 +376,8 @@ class JsonSchemaBuilder(JsonSchemaObject):
 
 class JsonSchemaBuilderResolver(JsonSchemaResolver):
     _refs = set()
+    _python_type_to_ref_map = {}
+    _refs_to_nodes = {}
 
     def __init__(self, builder: JsonSchemaBuilder):
         self._builder = builder
@@ -386,9 +389,24 @@ class JsonSchemaBuilderResolver(JsonSchemaResolver):
             else:
                 ref = self._find_ref_by_node(descr)
                 return ref
-        """else:
-            raise ValueError('Got description <{descr}>'.format(descr=descr))"""
-        return None
+
+        if descr in self._python_type_to_ref_map:
+            return self._python_type_to_ref_map[descr]
+
+        node = DefaultJsonSchemaResolver.get_instance().resolve(descr)
+        if isinstance(node, JsonSchemaObject):
+            ref_name = descr.__name__
+            node_ref = JsonSchemaRef(ref_name)
+            self._python_type_to_ref_map[descr] = node_ref
+            self._refs_to_nodes[ref_name] = node
+            self._builder.add_definition(ref_name, descr)
+
+            print('Got description <{descr}>'.format(descr=descr))
+            print('Resolved to <{resolve}>'.format(resolve=node))
+            print('Created ref_name <{ref_name}>'.format(ref_name=ref_name))
+            return node_ref
+
+        return node
 
     def _find_ref_by_name(self, name) -> (JsonSchemaRef, None):
         for d in self._builder._definitions:
