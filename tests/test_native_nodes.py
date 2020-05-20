@@ -1,10 +1,11 @@
 import json
 
-from .util import validate
 from jsbuilder.builder import JsonSchemaObject
 
+from .util import validate
 
-class MyType():
+
+class MyType:
     prop1: int
     prop2: str
 

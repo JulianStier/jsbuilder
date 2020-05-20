@@ -1,4 +1,5 @@
-from jsbuilder.builder import JsonSchemaObject, JsonSchemaNode
+from jsbuilder.builder import JsonSchemaNode
+from jsbuilder.builder import JsonSchemaObject
 
 
 class SimpleType:

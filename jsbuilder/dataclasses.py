@@ -1,19 +1,19 @@
 from dataclasses import _get_field
 
+
 type_map = {
     str: "string",
     int: "number",
     float: "number",
     dict: "object",
     list: "array",
-    bool: "boolean"
+    bool: "boolean",
 }
 
 
 def to_jsonschema(cls):
-    cls_annotations = cls.__dict__.get('__annotations__', {})
-    cls_fields = [_get_field(cls, name, type)
-                  for name, type in cls_annotations.items()]
+    cls_annotations = cls.__dict__.get("__annotations__", {})
+    cls_fields = [_get_field(cls, name, type) for name, type in cls_annotations.items()]
 
     definitions = {}
     properties = {}
@@ -35,5 +35,5 @@ def to_jsonschema(cls):
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
         "definitions": definitions,
-        "properties": properties
+        "properties": properties,
     }
