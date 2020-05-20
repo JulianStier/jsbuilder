@@ -48,9 +48,9 @@ def do_test_json_suite_file(path: str):
 
 
 def execute_test(test_obj):
-    json_description = test_obj["description"]
+    # json_description = test_obj["description"]
     json_tests = test_obj["tests"]
-    json_schema = test_obj["schema"]
+    # json_schema = test_obj["schema"]
 
     num_tests = 0
     for t in json_tests:
