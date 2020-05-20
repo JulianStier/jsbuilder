@@ -19,7 +19,7 @@ repos:
     rev: v2.3.0
     hooks:
       - id: trailing-whitespace
-        exclude: ^tests/.*/fixtures/.*
+        exclude: ^tests/json/.*
       - id: end-of-file-fixer
-        exclude: ^tests/.*/fixtures/.*
+        exclude: ^tests/json/.*
       - id: debug-statements
