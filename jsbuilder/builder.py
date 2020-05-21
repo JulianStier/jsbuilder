@@ -1,8 +1,17 @@
+import contextlib
+import functools
 import inspect
 import json
+import urllib.parse
 
 from dataclasses import _get_field
 from typing import List
+
+
+def resolve_id(schema):
+    if schema is True or schema is False:
+        return u""
+    return schema.get(u"$id", u"")
 
 
 class NativeJsonschemaTypes:
@@ -55,12 +64,60 @@ def _resolve_node(unknown_type):
 
 
 class JsonSchemaResolver:
+    def __init__(self, base_uri: str, reference=None, fn_urljoin=None):
+        self._scope_stack = [base_uri]
+        self._reference = reference
+
+        if fn_urljoin is None:
+            fn_urljoin = functools.lru_cache(1024)(urllib.parse.urljoin)
+        self._urljoin = fn_urljoin
+
+    @classmethod
+    def from_schema(cls, schema, fn_resolve_id=resolve_id, *args, **kwargs):
+        return cls(base_uri=fn_resolve_id(schema), reference=schema, *args, **kwargs)
+
+    @property
+    def scope(self):
+        return self._scope_stack[-1]
+
+    def push_scope(self, scope: str):
+        self._scope_stack.append(self._urljoin(self.scope, scope))
+
+    def pop_scope(self):
+        try:
+            self._scope_stack.pop()
+        except IndexError:
+            # TODO probably introduce own error hierarchy
+            raise ValueError(
+                "Failed to pop the scope from an empty stack. "
+                "`pop_scope()` should only be called once for every "
+                "`push_scope()`"
+            )
+
+    @contextlib.contextmanager
+    def in_scope(self, scope: str):
+        self.push_scope(scope)
+        try:
+            yield
+        finally:
+            self.pop_scope()
+
+    @contextlib.contextmanager
+    def resolving(self, ref: str):
+        url, resolved = self.resolve(ref)
+        self.push_scope(url)
+        try:
+            yield resolved
+        finally:
+            self.pop_scope()
+
     def resolve(self, descr):
         raise NotImplementedError()
 
 
-class JsonSchemaChainedResolver:
-    def __init__(self, resolvers: List[JsonSchemaResolver]):
+class JsonSchemaChainedResolver(JsonSchemaResolver):
+    def __init__(self, base_uri: str, resolvers: List[JsonSchemaResolver]):
+        super().__init__(base_uri)
         self._chain_resolvers = resolvers
 
     def __radd__(self, other):
@@ -84,7 +141,8 @@ class DefaultJsonSchemaResolver(JsonSchemaResolver):
     def get_instance(cls):
         CLS_KEY_INSTANCE = "__default_resolver"
         if not hasattr(cls, CLS_KEY_INSTANCE):
-            setattr(cls, CLS_KEY_INSTANCE, cls())
+            # TODO this instantiation is deprecated
+            setattr(cls, CLS_KEY_INSTANCE, cls(base_uri=""))
         return getattr(cls, CLS_KEY_INSTANCE)
 
     def resolve(self, unknown_type):
@@ -353,7 +411,11 @@ class JsonSchemaBuilder(JsonSchemaObject):
         self._properties = {}
         self._definitions = {}
         self.resolver = JsonSchemaChainedResolver(
-            [JsonSchemaBuilderResolver(self), DefaultJsonSchemaResolver.get_instance()]
+            schema_uri,
+            [
+                JsonSchemaBuilderResolver(schema_uri, self),
+                DefaultJsonSchemaResolver.get_instance(),
+            ],
         )
 
     def render(self):
@@ -399,7 +461,8 @@ class JsonSchemaBuilderResolver(JsonSchemaResolver):
     _python_type_to_ref_map = {}
     _refs_to_nodes = {}
 
-    def __init__(self, builder: JsonSchemaBuilder):
+    def __init__(self, base_uri: str, builder: JsonSchemaBuilder):
+        super().__init__(base_uri)
         self._builder = builder
 
     def resolve(self, descr):
