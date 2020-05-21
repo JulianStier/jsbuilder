@@ -72,10 +72,6 @@ class JsonSchemaResolver:
             fn_urljoin = functools.lru_cache(1024)(urllib.parse.urljoin)
         self._urljoin = fn_urljoin
 
-    @classmethod
-    def from_schema(cls, schema, fn_resolve_id=resolve_id, *args, **kwargs):
-        return cls(base_uri=fn_resolve_id(schema), reference=schema, *args, **kwargs)
-
     @property
     def scope(self):
         return self._scope_stack[-1]
@@ -115,6 +111,14 @@ class JsonSchemaResolver:
         raise NotImplementedError()
 
 
+class ObjectJsonSchemaResolver(JsonSchemaResolver):
+    def __init__(self, base_uri: str, schema):
+        super().__init__(base_uri)
+
+    def resolve(self, descr):
+        pass
+
+
 class JsonSchemaChainedResolver(JsonSchemaResolver):
     def __init__(self, base_uri: str, resolvers: List[JsonSchemaResolver]):
         super().__init__(base_uri)
@@ -146,22 +150,9 @@ class DefaultJsonSchemaResolver(JsonSchemaResolver):
         return getattr(cls, CLS_KEY_INSTANCE)
 
     def resolve(self, unknown_type):
-        if unknown_type is None:
-            return JsonSchemaNull()
-        if unknown_type is str:
-            if unknown_type in native_jsonschema_map:
-                return native_jsonschema_map[unknown_type]
-            return JsonSchemaString()
-        if unknown_type is bool:
-            return JsonSchemaBoolean()
-        if unknown_type is int:
-            return JsonSchemaInteger()
-        if unknown_type is float:
-            return JsonSchemaNumber()
-        if unknown_type is dict:
-            return JsonSchemaObject()
-        if unknown_type is list:
-            return JsonSchemaArray()
+        resolved = _resolve_node(unknown_type)
+        if resolved is not None:
+            return resolved
 
         # Given object is a complex class or an exemplary object
         # TODO use object to resolve

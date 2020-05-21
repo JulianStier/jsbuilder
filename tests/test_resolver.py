@@ -1,4 +1,4 @@
-from jsbuilder.builder import DefaultJsonSchemaResolver
+from jsbuilder.builder import DefaultJsonSchemaResolver, JsonSchemaResolver, ObjectJsonSchemaResolver
 from jsbuilder.builder import JsonSchemaArray
 from jsbuilder.builder import JsonSchemaInteger
 from jsbuilder.builder import JsonSchemaNumber
@@ -13,10 +13,22 @@ def test_dev():
             "my_arr": {"type": "array", "minItems": 1, "items": {"$ref": "#"}}
         },
     }
-    resolver = DefaultJsonSchemaResolver.from_schema(schema)
+    resolver = ObjectJsonSchemaResolver("", schema)
 
     with resolver.in_scope("schemaArray"):
         resolver.resolve("a")
+
+
+def test_resolve_array():
+    schema = {
+        "$id": "",
+        "definitions": {
+            "my_arr": {"type": "array", "minItems": 1, "items": {"$ref": "#"}}
+        },
+    }
+    resolver = ObjectJsonSchemaResolver("", schema)
+    node = resolver.resolve("my_arr")  # schema->RefNode[/definitions/my_arr]
+    print(node)
 
 
 def test_default_string_resolves_to_stringnode():
