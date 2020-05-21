@@ -2,6 +2,53 @@
 **Note:** Currently in prototyping development.
 
 
+# Example
+```python
+from jsbuilder.builder import JsonSchemaBuilder
+
+class SubType:
+    some_name: str
+    a_value: float = 2.5
+    camelNameSpaceProp1: str = "p1"
+
+builder = JsonSchemaBuilder()
+builder.add_property("name", str)
+builder.add_property("bar1", SubType)
+
+builder.render()
+```
+results in
+```json
+{
+ "$schema": "http://json-schema.org/draft-07/schema#",
+ "type": "object",
+ "definitions": {
+  "SubType": {
+   "type": "object",
+   "properties": {
+    "some_name": {
+     "type": "string"
+    },
+    "a_value": {
+     "type": "number"
+    },
+    "camelNameSpaceProp1": {
+     "type": "string"
+    }
+   }
+  }
+ },
+ "properties": {
+  "name": {
+   "type": "string"
+  },
+  "bar1": {
+   "$ref": "#/definitions/SubType"
+  }
+ }
+}
+```
+
 
 # Related Work
 - the official [json-schema](https://json-schema.org/) specification
