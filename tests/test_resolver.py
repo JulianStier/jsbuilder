@@ -1,27 +1,27 @@
-from jsbuilder.builder import DefaultJsonSchemaResolver, JsonSchemaString, JsonSchemaNumber, JsonSchemaArray, \
-    JsonSchemaInteger, JsonSchemaObject
+from jsbuilder.builder import DefaultJsonSchemaResolver
+from jsbuilder.builder import JsonSchemaArray
+from jsbuilder.builder import JsonSchemaInteger
+from jsbuilder.builder import JsonSchemaNumber
+from jsbuilder.builder import JsonSchemaObject
+from jsbuilder.builder import JsonSchemaString
 
 
 def test_dev():
     schema = {
         "$id": "",
         "definitions": {
-            "my_arr": {
-                "type": "array",
-                "minItems": 1,
-                "items": {"$ref": "#"}
-            }
-        }
+            "my_arr": {"type": "array", "minItems": 1, "items": {"$ref": "#"}}
+        },
     }
     resolver = DefaultJsonSchemaResolver.from_schema(schema)
 
-    with resolver.in_scope('schemaArray'):
-        resolver.resolve('a')
+    with resolver.in_scope("schemaArray"):
+        resolver.resolve("a")
 
 
 def test_default_string_resolves_to_stringnode():
     resolver = DefaultJsonSchemaResolver.get_instance()
-    resolved_node = resolver.resolve('str')
+    resolved_node = resolver.resolve("str")
 
     assert resolved_node == JsonSchemaString()
 

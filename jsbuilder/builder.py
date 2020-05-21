@@ -1,5 +1,4 @@
 import contextlib
-
 import functools
 import inspect
 import json
@@ -82,9 +81,7 @@ class JsonSchemaResolver:
         return self._scope_stack[-1]
 
     def push_scope(self, scope: str):
-        self._scope_stack.append(
-            self._urljoin(self.scope, scope),
-        )
+        self._scope_stack.append(self._urljoin(self.scope, scope))
 
     def pop_scope(self):
         try:
@@ -415,7 +412,10 @@ class JsonSchemaBuilder(JsonSchemaObject):
         self._definitions = {}
         self.resolver = JsonSchemaChainedResolver(
             schema_uri,
-            [JsonSchemaBuilderResolver(schema_uri, self), DefaultJsonSchemaResolver.get_instance()]
+            [
+                JsonSchemaBuilderResolver(schema_uri, self),
+                DefaultJsonSchemaResolver.get_instance(),
+            ],
         )
 
     def render(self):
