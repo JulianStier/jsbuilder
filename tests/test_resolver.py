@@ -1,9 +1,11 @@
-from jsbuilder.builder import DefaultJsonSchemaResolver, JsonSchemaResolver, ObjectJsonSchemaResolver
+from jsbuilder.builder import DefaultJsonSchemaResolver
 from jsbuilder.builder import JsonSchemaArray
 from jsbuilder.builder import JsonSchemaInteger
 from jsbuilder.builder import JsonSchemaNumber
 from jsbuilder.builder import JsonSchemaObject
+from jsbuilder.builder import JsonSchemaResolver
 from jsbuilder.builder import JsonSchemaString
+from jsbuilder.builder import ObjectJsonSchemaResolver
 
 
 def test_dev():
