@@ -207,21 +207,35 @@ class JsonSchemaNull(JsonSchemaNode):
 
 
 class JsonSchemaRef(JsonSchemaNode):
-    def __init__(self, ref_name: str, root: str = "#/definitions/"):
-        self._root = root
-        self._ref_name = ref_name
+    def __init__(
+        self, pointer: str, base_uri: str = None, resolver: JsonSchemaResolver = None
+    ):
+        """
+        Example: JsonSchemaRef("/definitions/custom_name", "") -> #/definitions/custom_name
+
+        :param pointer: A textual JSON pointer as of RFC6901, see https://tools.ietf.org/html/rfc6901
+        :param base_uri:
+        :param resolver:
+        """
+        self._base_uri = base_uri
+        self._pointer = pointer
+        self._resolver = resolver
 
     def render(self):
-        return {"$ref": self._root + self._ref_name}
+        # TODO do correct composition with either resolver or base_uri
+        ref_uri = self._base_uri if self._base_uri is not None else ""
+        ref_uri += "#/definitions/" + self._pointer
+        return {"$ref": ref_uri}
 
     def is_native(self):
         return False
 
     def __eq__(self, other):
+        # TODO check for equality even if we compare RefNode and ObjectNode
         if not isinstance(other, JsonSchemaRef):
             return False
 
-        return self._root == other._root and self._ref_name == other._ref_name
+        return self._base_uri == other._base_uri and self._pointer == other._pointer
 
 
 def _find_ref_node_in_defs(unknown_type, definitions: dict) -> (JsonSchemaRef, None):
